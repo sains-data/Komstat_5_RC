@@ -1,0 +1,248 @@
+---
+title: "tubes"
+author: "Keren Marito"
+date: "2025-11-18"
+output: html_document
+---
+
+```{r}
+# Menciptakan Variabel Baru & Subsetting Data
+
+# Memuat data
+data_pns <- read.csv("C:/Users/user/Downloads/Jumlah Pegawai Negeri Sipil Menurut Dinas_Instansi Pemerintah dan Jenis Kelamin, 2024.csv", sep=";")
+
+# 1. Menciptakan Variabel Baru (Dt$baru <- ekspresi)
+data_pns$Persentase_Wanita <- (data_pns$Wanita / data_pns$Total) * 100
+
+# 2. Subsetting Data (GabungT[Tinggi2,])
+Tinggi_Total <- data_pns$Total > 200
+data_pns_tinggi <- data_pns[Tinggi_Total, ]
+
+# MEMANGGIL HASIL SUBSETTING
+print("Output Subsetting (Total Pegawai > 200):")
+print(head(data_pns_tinggi, 5))
+```
+
+```{r}
+# 2. Subsetting Data (order(Dt$Variabel, decreasing = TRUE))
+Urutan_Total <- order(data_pns$Total, decreasing = TRUE)
+data_pns_urut <- data_pns[Urutan_Total, ]
+
+# MEMANGGIL HASIL SORTING (5 baris teratas)
+print("Output Sorting (Total Menurun):")
+print(head(data_pns_urut[, c("Instansi", "Total", "Dominasi_JK")], 5))
+```
+
+```{r}
+# 4. Recoding Data (factor(cut()))
+# Kategorisasi: Pria Dominan (<40%), Seimbang (40%-60%), Wanita Dominan (>60%)
+data_pns$Dominasi_JK <- factor(cut(data_pns$Persentase_Wanita,
+                                  breaks = c(-Inf, 40, 60, Inf),
+                                  labels = c("Pria Dominan", "Seimbang", "Wanita Dominan")))
+
+# MEMANGGIL HASIL RECODING (menampilkan 5 baris pertama, termasuk kolom baru)
+print("Output Recoding (Kolom Dominasi_JK):")
+print(head(data_pns[, c("Instansi", "Total", "Persentase_Wanita", "Dominasi_JK")], 5))
+```
+
+```{r}
+# Data frame tambahan (databaru)
+databaru <- data.frame(
+  Instansi = c("Setda Provinsi Sumatera Selatan", "Dinas Pendidikan Provinsi Sumatera Selatan", "Dinas Kesehatan Provinsi Sumatera Selatan", "Instansi Lain"),
+  Anggaran_Milyar = c(150, 800, 250, 50)
+)
+
+# 5. Merging Data (merge(x, y, by.x=..., all=TRUE))
+data_merge_all <- merge(data_pns, databaru, by.x = "Instansi", by.y = "Instansi", all = TRUE)
+
+# MEMANGGIL HASIL MERGING (5 baris teratas yang menunjukkan penggabungan)
+print("Output Merging (Gabungan Data PNS dan Anggaran):")
+print(head(data_merge_all[, c("Instansi", "Total", "Anggaran_Milyar")], 5))
+```
+
+```{r}
+# 6a. Reshaping Data (Wide to Long)
+data_reshape_wide <- data_pns[, c("Instansi", "Pria", "Wanita")]
+
+data_reshape_long <- reshape(data_reshape_wide,
+                             varying = c("Pria", "Wanita"),
+                             v.names = "Jumlah",
+                             timevar = "Jenis_Kelamin",
+                             times = c("Pria", "Wanita"),
+                             idvar = "Instansi",
+                             direction = "long")
+
+# MEMANGGIL HASIL RESHAPING (Bentuk Long)
+print("Output Reshaping (Wide ke Long, 5 baris teratas):")
+print(head(data_reshape_long, 5))
+```
+
+```{r}
+# 6b. Long to Wide Data Format
+# Fungsi yang dipanggil: reshape(data_long, idvar='Instansi', timevar='Jenis_Kelamin', v.names='Jumlah', direction='wide')
+
+data_reshape_back_wide <- reshape(data_reshape_long,
+                                  idvar = "Instansi",
+                                  timevar = "Jenis_Kelamin",
+                                  v.names = "Jumlah",
+                                  direction = "wide")
+
+# MEMANGGIL HASIL RESHAPING (Bentuk Wide)
+print("Output Reshaping (Long ke Wide, 5 baris teratas):")
+print(head(data_reshape_back_wide, 5))
+```
+
+```{r}
+# Memuat data dan kolom Munging yang diperlukan
+data_pns <- read.csv("C:/Users/user/Downloads/Jumlah Pegawai Negeri Sipil Menurut Dinas_Instansi Pemerintah dan Jenis Kelamin, 2024.csv", sep=";")
+data_pns$Persentase_Wanita <- (data_pns$Wanita / data_pns$Total) * 100
+data_pns$Dominasi_JK <- factor(cut(data_pns$Persentase_Wanita,
+                                  breaks = c(-Inf, 40, 60, Inf),
+                                  labels = c("Pria Dominan", "Seimbang", "Wanita Dominan")))
+```
+
+
+```{r}
+# 1. Recoding Total menjadi Kelompok Instansi (Wajib untuk Barchart)
+# Kriteria: Kecil (<100), Sedang (100-300), Besar (>300)
+data_pns$Kelompok_Total <- factor(cut(data_pns$Total,
+                                     breaks = c(0, 100, 300, Inf),
+                                     labels = c("Kecil (<100)", "Sedang (100-300)", "Besar (>300)")))
+```
+
+
+```{r}
+# 2. Muat library ggplot2
+library(ggplot2)
+```
+
+
+```{r}
+# VISUALISASI 1: BOXPLOT
+# Melihat distribusi Total Pegawai di setiap kelompok Dominasi Gender
+plot_boxplot <- ggplot(data_pns, aes(x = Dominasi_JK, y = Total, fill = Dominasi_JK)) +
+  geom_boxplot() +
+  scale_y_log10(labels = scales::comma) + # Menggunakan skala log untuk mengatasi skewness
+  labs(title = "Perbandingan Total Pegawai berdasarkan Dominasi Jenis Kelamin",
+       x = "Dominasi Jenis Kelamin",
+       y = "Total Pegawai (Skala Logaritmik)") +
+  theme_minimal()
+
+ggsave("boxplot_total_vs_dominasi_jk.png", plot_boxplot, width = 8, height = 6)
+print(plot_boxplot)
+# Output: boxplot_total_vs_dominasi_jk.png
+```
+
+
+```{r}
+# VISUALISASI 2: STACKED BARCHART
+# Melihat proporsi dominasi gender dalam setiap kategori ukuran instansi
+plot_barchart <- ggplot(data_pns, aes(x = Kelompok_Total, fill = Dominasi_JK)) +
+  geom_bar(position = "fill") + # position="fill" menunjukkan proporsi (0% - 100%)
+  scale_y_continuous(labels = scales::percent) +
+  labs(title = "Proporsi Dominasi Jenis Kelamin Berdasarkan Ukuran Instansi",
+       x = "Kelompok Ukuran Instansi (Total Pegawai)",
+       y = "Proporsi",
+       fill = "Dominasi Gender") +
+  theme_minimal()
+
+ggsave("barchart_dominasi_vs_kelompok_total.png", plot_barchart, width = 8, height = 6)
+print(plot_barchart)
+# Output: barchart_dominasi_vs_kelompok_total.png
+```
+```{r}
+# 2. Mengubah Data ke Format Panjang (Long Format) untuk ggplot
+# dan menghitung total 2024 untuk ranking
+data_long <- data_pns %>%
+  # Menghitung total 2024 untuk pengurutan
+  mutate(Total_2024 = `Jumlah 2024`) %>%
+  # Mengubah format dari lebar ke panjang
+  pivot_longer(
+    cols = starts_with("Jumlah"),
+    names_to = "Tahun",
+    values_to = "Jumlah_PNS"
+  ) %>%
+  # Membersihkan kolom Tahun (hanya menyisakan angka tahun)
+  mutate(
+    Tahun = str_replace(Tahun, "Jumlah ", ""),
+    Tahun = as.numeric(Tahun)
+  )
+```
+
+
+```{r}
+# 3. Memilih 10 Instansi Teratas (Top 10) berdasarkan Jumlah 2024
+top_10_instansi <- data_long %>%
+  # Mengambil nilai Total_2024 untuk setiap instansi
+  distinct(Instansi, Total_2024) %>%
+  # Mengurutkan dari yang terbesar
+  arrange(desc(Total_2024)) %>%
+  # Mengambil 10 baris teratas
+  head(10) %>%
+  pull(Instansi)
+```
+
+
+```{r}
+# 4. Memfilter Data untuk Top 10 Instansi
+data_filtered <- data_long %>%
+  filter(Instansi %in% top_10_instansi)
+```
+
+
+```{r}
+# 5. Membuat Visualisasi Grafik Garis yang Bagus (Line Chart)
+# Grafik Garis sangat cocok untuk melihat tren dari waktu ke waktu.
+
+plot_pns <- data_filtered %>%
+  ggplot(aes(x = Tahun, y = Jumlah_PNS, group = Instansi, color = Instansi)) +
+  
+  # Garis tebal untuk tren
+  geom_line(linewidth = 1.2) +
+  # Titik pada setiap tahun
+  geom_point(size = 3) +
+  # Menambahkan label pada titik terakhir (tahun 2024) untuk Instansi
+  geom_text(
+    data = data_filtered %>% filter(Tahun == 2024),
+    aes(label = Instansi),
+    hjust = -0.05,  # Sedikit di kanan titik
+    vjust = 0.5,
+    size = 3.5
+  ) +
+  
+  # Menggunakan Tema Modern dan Bersih (Theme)
+  theme_minimal(base_size = 14) +
+  
+  # Pengaturan Sumbu X (Tahun)
+  scale_x_continuous(breaks = c(2021, 2022, 2023, 2024), limits = c(2021, 2024.5)) +
+  
+  # Pengaturan Sumbu Y (Jumlah PNS)
+  scale_y_continuous(labels = comma) + # Format angka dengan koma
+  
+  # Label dan Judul
+  labs(
+    title = "Tren Jumlah Pegawai Negeri Sipil (PNS) Instansi Teratas",
+    subtitle = "Perbandingan Tahun 2021 hingga 2024 (10 Instansi dengan Jumlah PNS Terbanyak 2024)",
+    x = "Tahun",
+    y = "Jumlah PNS (Jiwa)",
+    caption = paste("Sumber Data:", file_path)
+  ) +
+  
+  # Mempercantik Visualisasi
+  theme(
+    plot.title = element_text(face = "bold", size = 18, color = "#2c3e50"),
+    plot.subtitle = element_text(size = 12, color = "#7f8c8d"),
+    legend.position = "none", # Menghilangkan legenda karena Instansi dilabeli langsung pada garis
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank(), # Hanya tampilkan garis bantu horizontal
+    axis.title = element_text(face = "bold"),
+    plot.caption = element_text(hjust = 0, size = 10, color = "#bdc3c7")
+  )
+
+# Tampilkan plot
+print(plot_pns)
+
+# Opsional: Simpan plot ke file resolusi tinggi (misalnya PNG)
+# ggsave("perbandingan_pns_tren.png", plot = plot_pns, width = 12, height = 8, units = "in", dpi = 300)
+```
+
